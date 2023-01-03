@@ -53,22 +53,38 @@ def main():
             rows.append(dict(zip(header, row)))
 
     for row in rows:
+        post_count_qty = 0
+        diff_qty = 0
+        if float(row["chg.value"]) > 0:
+            post_count_qty = int(
+                float(row["post-count.value"]) / float(row["chg.value"])
+            )
+            diff_qty = post_count_qty - int(row["pre-count.qty"])
+
         row["chg.value"] = float(row["chg.value"])
         row["pre-count.value"] = float(row["pre-count.value"])
         row["post-count.value"] = float(row["post-count.value"])
         row["diff.value"] = float(row["diff.value"])
         row["pre-count.qty"] = int(row["pre-count.qty"])
-        row["post-count.qty"] = int(row["post-count.qty"])
-        row["diff.qty"] = int(row["diff.qty"])
+        row["post-count.qty"] = post_count_qty
+        row["diff.qty"] = diff_qty
 
     for row in rows_non_zero:
+        post_count_qty = 0
+        diff_qty = 0
+        if float(row["chg.value"]) > 0:
+            post_count_qty = int(
+                float(row["post-count.value"]) / float(row["chg.value"])
+            )
+            diff_qty = post_count_qty - int(row["pre-count.qty"])
+
         row["chg.value"] = float(row["chg.value"])
         row["pre-count.value"] = float(row["pre-count.value"])
         row["post-count.value"] = float(row["post-count.value"])
         row["diff.value"] = float(row["diff.value"])
         row["pre-count.qty"] = int(row["pre-count.qty"])
-        row["post-count.qty"] = int(row["post-count.qty"])
-        row["diff.qty"] = int(row["diff.qty"])
+        row["post-count.qty"] = post_count_qty
+        row["diff.qty"] = diff_qty
 
     return rows, rows_non_zero
 
