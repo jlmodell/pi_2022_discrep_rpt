@@ -2,8 +2,20 @@ import os
 import csv
 import logging
 import pandas as pd
+import warnings
 from datetime import datetime
 from rich import print
+
+
+def fxn():
+    warnings.warn("deprecated", DeprecationWarning)
+    warnings.warn("future", FutureWarning)
+
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    fxn()
+
 
 LOG_FP = r"\\busse\Purchasing\Physical Inventory\logs"
 
@@ -42,71 +54,88 @@ def main():
     ]
 
     rows = []
-    rows_non_zero = []
 
     with open(FILE_PATH, "r") as f:
         reader = csv.reader(f)
 
         for row in reader:
-            if int(row[7]) != 0:
-                rows_non_zero.append(dict(zip(header, row)))
             rows.append(dict(zip(header, row)))
 
+    pre_count_value = 0
+    post_count_value = 0
+    diff_value = 0
+    pre_count_qty = 0
+    post_count_qty = 0
+    diff_qty = 0
+
     for row in rows:
-        post_count_qty = 0
-        diff_qty = 0
-        if float(row["chg.value"]) > 0:
-            post_count_qty = int(
-                float(row["post-count.value"]) / float(row["chg.value"])
-            )
-            diff_qty = post_count_qty - int(row["pre-count.qty"])
-
         row["chg.value"] = float(row["chg.value"])
         row["pre-count.value"] = float(row["pre-count.value"])
         row["post-count.value"] = float(row["post-count.value"])
         row["diff.value"] = float(row["diff.value"])
         row["pre-count.qty"] = int(row["pre-count.qty"])
-        row["post-count.qty"] = post_count_qty
-        row["diff.qty"] = diff_qty
+        row["post-count.qty"] = int(row["post-count.qty"])
+        row["diff.qty"] = int(row["diff.qty"])
 
-    for row in rows_non_zero:
-        post_count_qty = 0
-        diff_qty = 0
-        if float(row["chg.value"]) > 0:
-            post_count_qty = int(
-                float(row["post-count.value"]) / float(row["chg.value"])
-            )
-            diff_qty = post_count_qty - int(row["pre-count.qty"])
+        pre_count_value += row["pre-count.value"]
+        post_count_value += row["post-count.value"]
+        diff_value += row["diff.value"]
+        pre_count_qty += row["pre-count.qty"]
+        post_count_qty += row["post-count.qty"]
+        diff_qty += row["diff.qty"]
 
-        row["chg.value"] = float(row["chg.value"])
-        row["pre-count.value"] = float(row["pre-count.value"])
-        row["post-count.value"] = float(row["post-count.value"])
-        row["diff.value"] = float(row["diff.value"])
-        row["pre-count.qty"] = int(row["pre-count.qty"])
-        row["post-count.qty"] = post_count_qty
-        row["diff.qty"] = diff_qty
+    # rows.append(["", "", "", "", "", "", "", "", "", ""])
+    # rows.append(
+    #     [
+    #         "Total",
+    #         "",
+    #         "",
+    #         "",
+    #         pre_count_value,
+    #         post_count_value,
+    #         diff_value,
+    #         pre_count_qty,
+    #         post_count_qty,
+    #         diff_qty,
+    #     ]
+    # )
 
-    return rows, rows_non_zero
+    df = pd.DataFrame(rows)
 
+    df = df.append(
+        pd.Series(
+            [
+                "Total",
+                "",
+                "",
+                "",
+                pre_count_value,
+                post_count_value,
+                diff_value,
+                pre_count_qty,
+                post_count_qty,
+                diff_qty,
+            ],
+            index=df.columns,
+        ),
+        ignore_index=True,
+    )
 
-def sort_largest_value(df: pd.DataFrame) -> pd.DataFrame:
-    return df.sort_values(by="diff.value", ascending=False).copy()
-
-
-def sort_smallest_value(df: pd.DataFrame) -> pd.DataFrame:
-    return df.sort_values(by="diff.value", ascending=True).copy()
+    return df
 
 
 def print_metrics(df: pd.DataFrame) -> None:
     print("---------------------------------")
-    total_pre_count_value = df["pre-count.value"].sum()
+    total_pre_count_value = df["pre-count.value"].sum() - df["pre-count.value"].iloc[-1]
     print(f"Total Pre Count Value: {total_pre_count_value}")
     LOGGER.info(f"Total Pre Count Value: {total_pre_count_value}")
-    total_post_count_value = df["post-count.value"].sum()
+    total_post_count_value = (
+        df["post-count.value"].sum() - df["post-count.value"].iloc[-1]
+    )
     print(f"Total Post Count Value: {total_post_count_value}")
     LOGGER.info(f"Total Post Count Value: {total_post_count_value}")
     print("---------------------------------")
-    diff_sum = df["diff.value"].sum()
+    diff_sum = df["diff.value"].sum() - df["diff.value"].iloc[-1]
     print(f"Total Diff: {diff_sum}")
     LOGGER.info(f"Total Diff: {diff_sum}")
     print("---------------------------------")
@@ -115,25 +144,16 @@ def print_metrics(df: pd.DataFrame) -> None:
     LOGGER.info(f"Percent Diff: {percent_diff}%")
 
 
-def print_top(df: pd.DataFrame, descriptor: str) -> None:
-    df_top = df.head(15)
-
-    print("")
-    print("=================================")
-    print(f"Top {len(df_top)} - {descriptor}")
-    LOGGER.info(f"Top {len(df_top)} - {descriptor}")
-    print("=================================")
-    print(df_top)
-    LOGGER.info(df_top)
-    print("=================================")
-    print("")
-
-
-def save_to_excel(df: list[pd.DataFrame], file_name: str) -> None:
+def save_to_excel(
+    df: list[pd.DataFrame],
+    file_name: str,
+    sheet_names: list[str],
+    year: str = input("What year is it?\t > "),
+) -> None:
     base_path = r"c:\temp"
 
-    if os.path.exists(r"\\busse\purchasing\Physical Inventory\2022\discrepancies"):
-        base_path = r"\\busse\purchasing\Physical Inventory\2022\discrepancies"
+    if os.path.exists(rf"\\busse\purchasing\Physical Inventory\{year}\discrepancies"):
+        base_path = rf"\\busse\purchasing\Physical Inventory\{year}\discrepancies"
         print("Using network path for output file.")
         print(f"Path: {base_path}")
 
@@ -142,11 +162,6 @@ def save_to_excel(df: list[pd.DataFrame], file_name: str) -> None:
     )
 
     with pd.ExcelWriter(save_path, engine="xlsxwriter") as writer:
-        sheet_names = {
-            0: "All",
-            1: "Sorted By Largest",
-            2: "Sorted By Smallest",
-        }
         for i, df in enumerate(df):
             try:
                 df.to_excel(writer, sheet_name=sheet_names[i], index=False)
@@ -155,18 +170,7 @@ def save_to_excel(df: list[pd.DataFrame], file_name: str) -> None:
 
 
 if __name__ == "__main__":
-    rows, non_zero_rows = main()
-
-    df_all = pd.DataFrame(rows)
-    df_non_zero = pd.DataFrame(non_zero_rows)
-
-    df_non_zero_largest = sort_largest_value(df_non_zero)
-    df_non_zero_smallest = sort_smallest_value(df_non_zero)
-
-    LOGGER.info("start")
+    df_all = main()
     print_metrics(df_all)
-    print_top(df_non_zero_largest, "largest")
-    print_top(df_non_zero_smallest, "smallest")
-    LOGGER.info("end")
 
-    save_to_excel([df_all, df_non_zero_largest, df_non_zero_smallest], FILE_NAME)
+    save_to_excel([df_all], FILE_NAME, ["All"])
