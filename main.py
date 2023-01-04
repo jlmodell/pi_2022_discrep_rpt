@@ -6,6 +6,8 @@ import warnings
 from datetime import datetime
 from rich import print
 
+# pyinstaller -F main.py
+
 
 def fxn():
     warnings.warn("deprecated", DeprecationWarning)
